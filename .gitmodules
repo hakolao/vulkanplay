@@ -1,0 +1,3 @@
+[submodule "lib/libcpp_matrix"]
+	path = lib/libcpp_matrix
+	url = git@github.com:hakolao/libcpp_matrix.git
