@@ -10,7 +10,14 @@
 
 #include "libcpp_matrix.h"
 
-#define NDEBUG 1
+const std::vector<const char *> validationLayers = {
+	"VK_LAYER_KHRONOS_validation"};
+
+#ifdef NDEBUG
+const bool enableValidationLayers = false;
+#else
+const bool enableValidationLayers = true;
+#endif
 
 #define ERROR_CHECK(test, message)                     \
 	do {                                               \
@@ -20,28 +27,27 @@
 class VulkanPlayApp {
    public:
 	void run(uint32_t width, uint32_t height, const char *name);
+	static VKAPI_ATTR VkBool32 VKAPI_CALL
+	debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+				  VkDebugUtilsMessageTypeFlagsEXT messageType,
+				  const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+				  void *pUserData);
 
    private:
 	bool isRunning = true;
 	SDL_Window *window;
 	VkInstance instance;
+	VkDebugUtilsMessengerEXT debugMessenger;
 	VkSurfaceKHR surface;
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
 	void createVulkanInstance(const char *name);
+	void setupDebugMessenger();
 	void createVulkanSurface();
 	void mainLoop();
 	void cleanup();
 	bool validVulkanExtensions(vector<const char *> extensionNames);
 	bool checkValidationLayerSupport();
-
-	std::vector<const char *> validationLayers;
-
-#ifdef NDEBUG
-	const bool enableValidationLayers = false;
-#else
-	const bool enableValidationLayers = true;
-#endif
 };
 
 #endif
