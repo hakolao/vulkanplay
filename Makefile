@@ -20,7 +20,8 @@ INCL = -I ./incl -I $(LIBCPP_MATRIX)/incl \
 		-I$(LIBSDL2)/SDL2_ttf.framework/Headers
 
 FLAGS = -Wall -Wextra -Werror -O2 -std=c++11
-SOURCES = main.cpp
+SOURCES = main.cpp \
+			vulkanplay.cpp
 
 SRCS = $(addprefix $(DIR_SRC)/,$(SOURCES))
 OBJS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.cpp=.o))
