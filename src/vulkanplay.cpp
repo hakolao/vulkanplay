@@ -8,9 +8,14 @@ using namespace std;
 void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 	ERROR_CHECK(SDL_Init(SDL_INIT_VIDEO) != 0, SDL_GetError());
 	this->initWindow(width, height, name);
-	this->initVulkan();
+	this->initVulkan(name);
 	this->mainLoop();
 	this->cleanup();
+}
+
+void VulkanPlayApp::initVulkan(const char *name) {
+	this->createVulkanInstance(name);
+	this->createVulkanSurface();
 }
 
 void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
@@ -22,7 +27,7 @@ void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
 	this->window = window;
 }
 
-void VulkanPlayApp::initVulkan() {
+void VulkanPlayApp::createVulkanInstance(const char *name) {
 	uint32_t extensionCount;
 	ERROR_CHECK(
 		!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr),
@@ -32,7 +37,12 @@ void VulkanPlayApp::initVulkan() {
 												  extensionNames.data()),
 				"Failed to get extension names");
 
-	const VkApplicationInfo appInfo = {};
+	VkApplicationInfo appInfo = {};
+	appInfo.pApplicationName = name;
+	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.pEngineName = "No Engine";
+	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.apiVersion = VK_API_VERSION_1_0;
 
 	vector<const char *> layerNames{};
 	layerNames.push_back("VK_LAYER_KHRONOS_validation");
@@ -49,10 +59,13 @@ void VulkanPlayApp::initVulkan() {
 	ERROR_CHECK(vkCreateInstance(&info, nullptr, &instance) != VK_SUCCESS,
 				"Failed to create a Vulkan Instance");
 	this->instance = instance;
+}
 
+void VulkanPlayApp::createVulkanSurface() {
 	VkSurfaceKHR surface;
-	ERROR_CHECK(!SDL_Vulkan_CreateSurface(window, instance, &surface),
-				"Failed to create a Vulkan surface");
+	ERROR_CHECK(
+		!SDL_Vulkan_CreateSurface(this->window, this->instance, &surface),
+		"Failed to create a Vulkan surface");
 	this->surface = surface;
 }
 

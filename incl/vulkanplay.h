@@ -8,12 +8,9 @@
 
 #include "libcpp_matrix.h"
 
-#define ERROR_CHECK(test, message)         \
-	do {                                   \
-		if ((test)) {                      \
-			dprintf(2, "%s\n", (message)); \
-			exit(1);                       \
-		}                                  \
+#define ERROR_CHECK(test, message)                     \
+	do {                                               \
+		if ((test)) throw std::runtime_error(message); \
 	} while (0)
 
 class VulkanPlayApp {
@@ -26,7 +23,9 @@ class VulkanPlayApp {
 	VkInstance instance;
 	VkSurfaceKHR surface;
 	void initWindow(uint32_t width, uint32_t height, const char *name);
-	void initVulkan();
+	void initVulkan(const char *name);
+	void createVulkanInstance(const char *name);
+	void createVulkanSurface();
 	void mainLoop();
 	void cleanup();
 };
