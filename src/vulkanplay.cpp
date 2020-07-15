@@ -15,6 +15,7 @@ void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 }
 
 void VulkanPlayApp::initVulkan(const char *name) {
+	this->validationLayers.push_back("VK_LAYER_KHRONOS_validation");
 	this->createVulkanInstance(name);
 	this->createVulkanSurface();
 }
@@ -41,7 +42,33 @@ bool VulkanPlayApp::validVulkanExtensions(vector<const char *> extensionNames) {
 	return matchCount == extensionNames.size();
 }
 
+bool VulkanPlayApp::checkValidationLayerSupport() {
+	uint32_t layerCount;
+	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+	vector<VkLayerProperties> availableLayers(layerCount);
+	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+	for (const char *layerName : this->validationLayers) {
+		bool layerFound = false;
+
+		for (const auto &layerProperties : availableLayers) {
+			if (strcmp(layerName, layerProperties.layerName) == 0) {
+				layerFound = true;
+				break;
+			}
+		}
+
+		if (!layerFound) {
+			return false;
+		}
+	}
+	return false;
+}
+
 void VulkanPlayApp::createVulkanInstance(const char *name) {
+	ERROR_CHECK(enableValidationLayers && !checkValidationLayerSupport(),
+				"validation layers requested, but not available!");
 	uint32_t extensionCount = 0;
 	ERROR_CHECK(
 		!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr),
@@ -61,19 +88,21 @@ void VulkanPlayApp::createVulkanInstance(const char *name) {
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 
-	vector<const char *> layerNames{};
-	layerNames.push_back("VK_LAYER_KHRONOS_validation");
-
-	VkInstanceCreateInfo info{};
-	info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	info.pApplicationInfo = &appInfo;
-	info.enabledLayerCount = layerNames.size();
-	info.ppEnabledLayerNames = layerNames.data();
-	info.enabledExtensionCount = extensionNames.size();
-	info.ppEnabledExtensionNames = extensionNames.data();
+	VkInstanceCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	createInfo.pApplicationInfo = &appInfo;
+	if (enableValidationLayers) {
+		createInfo.enabledLayerCount =
+			static_cast<uint32_t>(this->validationLayers.size());
+		createInfo.ppEnabledLayerNames = this->validationLayers.data();
+	} else {
+		createInfo.enabledLayerCount = 0;
+	}
+	createInfo.enabledExtensionCount = extensionNames.size();
+	createInfo.ppEnabledExtensionNames = extensionNames.data();
 
 	VkInstance instance;
-	ERROR_CHECK(vkCreateInstance(&info, nullptr, &instance) != VK_SUCCESS,
+	ERROR_CHECK(vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS,
 				"Failed to create a Vulkan Instance");
 	this->instance = instance;
 }

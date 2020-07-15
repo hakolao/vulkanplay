@@ -6,7 +6,11 @@
 #include <stdio.h>
 #include <vulkan/vulkan.h>
 
+#include <vector>
+
 #include "libcpp_matrix.h"
+
+#define NDEBUG 1
 
 #define ERROR_CHECK(test, message)                     \
 	do {                                               \
@@ -29,6 +33,15 @@ class VulkanPlayApp {
 	void mainLoop();
 	void cleanup();
 	bool validVulkanExtensions(vector<const char *> extensionNames);
+	bool checkValidationLayerSupport();
+
+	std::vector<const char *> validationLayers;
+
+#ifdef NDEBUG
+	const bool enableValidationLayers = false;
+#else
+	const bool enableValidationLayers = true;
+#endif
 };
 
 #endif
