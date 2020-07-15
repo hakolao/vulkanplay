@@ -28,6 +28,7 @@ class VulkanPlayApp {
 	void createVulkanSurface();
 	void mainLoop();
 	void cleanup();
+	bool validVulkanExtensions(vector<const char *> extensionNames);
 };
 
 #endif

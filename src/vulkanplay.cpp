@@ -1,5 +1,6 @@
 #include "vulkanplay.h"
 
+#include <algorithm>
 #include <iostream>
 #include <vector>
 
@@ -27,8 +28,21 @@ void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
 	this->window = window;
 }
 
+bool VulkanPlayApp::validVulkanExtensions(vector<const char *> extensionNames) {
+	uint32_t extensionCount = 0;
+	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+	vector<VkExtensionProperties> availableExtensions(extensionCount);
+	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount,
+										   availableExtensions.data());
+	uint32_t matchCount = 0;
+	for (const auto &extension : availableExtensions)
+		for (const auto &name : extensionNames)
+			if (strcmp(name, extension.extensionName) == 0) matchCount++;
+	return matchCount == extensionNames.size();
+}
+
 void VulkanPlayApp::createVulkanInstance(const char *name) {
-	uint32_t extensionCount;
+	uint32_t extensionCount = 0;
 	ERROR_CHECK(
 		!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr),
 		"Failed to get instance extensions");
@@ -36,6 +50,9 @@ void VulkanPlayApp::createVulkanInstance(const char *name) {
 	ERROR_CHECK(!SDL_Vulkan_GetInstanceExtensions(window, &extensionCount,
 												  extensionNames.data()),
 				"Failed to get extension names");
+
+	ERROR_CHECK(!this->validVulkanExtensions(extensionNames),
+				"Some SDL vulkan extensions not found in availalbe extensions");
 
 	VkApplicationInfo appInfo = {};
 	appInfo.pApplicationName = name;
