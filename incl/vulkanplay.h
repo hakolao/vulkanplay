@@ -67,6 +67,7 @@ class VulkanPlayApp {
 	vector<VkImage> swapChainImages;
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
+	vector<VkImageView> swapChainImageViews;
 
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
@@ -86,6 +87,7 @@ class VulkanPlayApp {
 	void pickPhysicalDevice();
 	void createLogicalDevice();
 	void createSwapChain();
+	void createImageViews();
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	void mainLoop();
 	void cleanup();
