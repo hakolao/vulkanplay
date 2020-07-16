@@ -46,6 +46,8 @@ class VulkanPlayApp {
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkSurfaceKHR surface;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkDevice device;
+	VkQueue graphicsQueue;
 
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
@@ -55,6 +57,7 @@ class VulkanPlayApp {
 	bool validVulkanExtensions(vector<const char *> extensionNames);
 	bool checkValidationLayerSupport();
 	void pickPhysicalDevice();
+	void createLogicalDevice();
 	void mainLoop();
 	void cleanup();
 };

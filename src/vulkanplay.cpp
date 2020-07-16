@@ -130,8 +130,41 @@ void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 	initVulkan(name);
 	setupDebugMessenger();
 	pickPhysicalDevice();
+	createLogicalDevice();
 	mainLoop();
 	cleanup();
+}
+
+void VulkanPlayApp::createLogicalDevice() {
+	QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+	VkDeviceQueueCreateInfo queueCreateInfo{};
+	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+	queueCreateInfo.queueCount = 1;
+	float queuePriority = 1.0f;
+	queueCreateInfo.pQueuePriorities = &queuePriority;
+	VkPhysicalDeviceFeatures deviceFeatures{};
+
+	VkDeviceCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pQueueCreateInfos = &queueCreateInfo;
+	createInfo.queueCreateInfoCount = 1;
+
+	createInfo.pEnabledFeatures = &deviceFeatures;
+	createInfo.enabledExtensionCount = 0;
+
+	if (enableValidationLayers) {
+		createInfo.enabledLayerCount =
+			static_cast<uint32_t>(validationLayers.size());
+		createInfo.ppEnabledLayerNames = validationLayers.data();
+	} else {
+		createInfo.enabledLayerCount = 0;
+	}
+	ERROR_CHECK(vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) !=
+					VK_SUCCESS,
+				"Failed to create logical device!");
+	vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
 }
 
 void VulkanPlayApp::pickPhysicalDevice() {
@@ -163,17 +196,16 @@ void VulkanPlayApp::setupDebugMessenger() {
 }
 
 void VulkanPlayApp::initVulkan(const char *name) {
-	this->createVulkanInstance(name);
-	this->createVulkanSurface();
+	createVulkanInstance(name);
+	createVulkanSurface();
 }
 
 void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
 							   const char *name) {
-	SDL_Window *window = SDL_CreateWindow(
-		name, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height,
-		SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow(name, SDL_WINDOWPOS_CENTERED,
+							  SDL_WINDOWPOS_CENTERED, width, height,
+							  SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 	ERROR_CHECK(window == NULL, SDL_GetError());
-	this->window = window;
 }
 
 bool VulkanPlayApp::validVulkanExtensions(vector<const char *> extensionNames) {
@@ -217,7 +249,7 @@ void VulkanPlayApp::createVulkanInstance(const char *name) {
 	ERROR_CHECK(enableValidationLayers && !checkValidationLayerSupport(),
 				"validation layers requested, but not available!");
 	auto extensionNames = getRequiredExtensions(window);
-	ERROR_CHECK(!this->validVulkanExtensions(extensionNames),
+	ERROR_CHECK(!validVulkanExtensions(extensionNames),
 				"Some SDL vulkan extensions not found in availalbe extensions");
 
 	VkApplicationInfo appInfo = {};
@@ -247,22 +279,17 @@ void VulkanPlayApp::createVulkanInstance(const char *name) {
 	createInfo.enabledExtensionCount = extensionNames.size();
 	createInfo.ppEnabledExtensionNames = extensionNames.data();
 
-	VkInstance instance;
 	ERROR_CHECK(vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS,
 				"Failed to create a Vulkan Instance");
-	this->instance = instance;
 }
 
 void VulkanPlayApp::createVulkanSurface() {
-	VkSurfaceKHR surface;
-	ERROR_CHECK(
-		!SDL_Vulkan_CreateSurface(this->window, this->instance, &surface),
-		"Failed to create a Vulkan surface");
-	this->surface = surface;
+	ERROR_CHECK(!SDL_Vulkan_CreateSurface(window, instance, &surface),
+				"Failed to create a Vulkan surface");
 }
 
 void VulkanPlayApp::mainLoop() {
-	while (this->isRunning) {
+	while (isRunning) {
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT) isRunning = false;
@@ -272,11 +299,12 @@ void VulkanPlayApp::mainLoop() {
 }
 
 void VulkanPlayApp::cleanup() {
+	vkDestroyDevice(device, nullptr);
 	if (enableValidationLayers) {
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 	}
-	vkDestroySurfaceKHR(this->instance, this->surface, 0);
-	SDL_DestroyWindow(this->window);
-	vkDestroyInstance(this->instance, 0);
+	vkDestroySurfaceKHR(instance, surface, 0);
+	SDL_DestroyWindow(window);
+	vkDestroyInstance(instance, 0);
 	SDL_Quit();
 }
