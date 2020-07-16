@@ -11,8 +11,14 @@
 
 #include "libcpp_matrix.h"
 
+#define WIDTH 1280
+#define HEIGHT 720
+
 const std::vector<const char *> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"};
+
+const std::vector<const char *> deviceExtensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -31,6 +37,12 @@ struct QueueFamilyIndices {
 	bool isComplete();
 };
 
+struct SwapChainSupportDetails {
+	VkSurfaceCapabilitiesKHR capabilities;
+	vector<VkSurfaceFormatKHR> formats;
+	vector<VkPresentModeKHR> presentModes;
+};
+
 class VulkanPlayApp {
    public:
 	void run(uint32_t width, uint32_t height, const char *name);
@@ -41,6 +53,7 @@ class VulkanPlayApp {
 				  void *pUserData);
 
    private:
+	// Todo Add width and height that change on resize
 	bool isRunning = true;
 	SDL_Window *window;
 	VkInstance instance;
@@ -50,6 +63,10 @@ class VulkanPlayApp {
 	VkDevice device;
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
+	VkSwapchainKHR swapChain;
+	vector<VkImage> swapChainImages;
+	VkFormat swapChainImageFormat;
+	VkExtent2D swapChainExtent;
 
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
@@ -59,8 +76,16 @@ class VulkanPlayApp {
 	bool validVulkanExtensions(vector<const char *> extensionNames);
 	bool checkValidationLayerSupport();
 	int rateDeviceSuitability(VkPhysicalDevice device);
+	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+	VkSurfaceFormatKHR chooseSwapSurfaceFormat(
+		const std::vector<VkSurfaceFormatKHR> &availableFormats);
+	VkPresentModeKHR chooseSwapPresentMode(
+		const std::vector<VkPresentModeKHR> &availablePresentModes);
+	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 	void pickPhysicalDevice();
 	void createLogicalDevice();
+	void createSwapChain();
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	void mainLoop();
 	void cleanup();

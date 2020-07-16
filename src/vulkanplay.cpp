@@ -1,6 +1,7 @@
 #include "vulkanplay.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <set>
@@ -66,30 +67,6 @@ static void populateDebugMessengerCreateInfo(
 	createInfo.pfnUserCallback = VulkanPlayApp::debugCallback;
 }
 
-int VulkanPlayApp::rateDeviceSuitability(VkPhysicalDevice device) {
-	VkPhysicalDeviceProperties deviceProperties;
-	vkGetPhysicalDeviceProperties(device, &deviceProperties);
-	VkPhysicalDeviceFeatures deviceFeatures;
-	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-	int score = 0;
-
-	// Discrete GPUs have a significant performance advantage
-	if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-		score += 1000;
-	}
-
-	// Maximum possible size of textures affects graphics quality
-	score += deviceProperties.limits.maxImageDimension2D;
-	// if (!deviceFeatures.geometryShader) {
-	// 	return 0;
-	// }
-
-	QueueFamilyIndices indices = findQueueFamilies(device);
-	if (!indices.isComplete()) return 0;
-
-	return score;
-}
-
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanPlayApp::debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -111,8 +88,188 @@ void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 	setupDebugMessenger();
 	pickPhysicalDevice();
 	createLogicalDevice();
+	createSwapChain();
 	mainLoop();
 	cleanup();
+}
+
+void VulkanPlayApp::createSwapChain() {
+	SwapChainSupportDetails swapChainSupport =
+		querySwapChainSupport(physicalDevice);
+
+	VkSurfaceFormatKHR surfaceFormat =
+		chooseSwapSurfaceFormat(swapChainSupport.formats);
+	VkPresentModeKHR presentMode =
+		chooseSwapPresentMode(swapChainSupport.presentModes);
+	VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+	if (swapChainSupport.capabilities.maxImageCount > 0 &&
+		imageCount > swapChainSupport.capabilities.maxImageCount) {
+		imageCount = swapChainSupport.capabilities.maxImageCount;
+	}
+
+	VkSwapchainCreateInfoKHR createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	createInfo.surface = surface;
+	createInfo.minImageCount = imageCount;
+	createInfo.imageFormat = surfaceFormat.format;
+	createInfo.imageColorSpace = surfaceFormat.colorSpace;
+	createInfo.imageExtent = extent;
+	createInfo.imageArrayLayers = 1;
+	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+	uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(),
+									 indices.presentFamily.value()};
+
+	if (indices.graphicsFamily != indices.presentFamily) {
+		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		createInfo.queueFamilyIndexCount = 2;
+		createInfo.pQueueFamilyIndices = queueFamilyIndices;
+	} else {
+		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		createInfo.queueFamilyIndexCount = 0;	   // Optional
+		createInfo.pQueueFamilyIndices = nullptr;  // Optional
+	}
+	createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	createInfo.presentMode = presentMode;
+	createInfo.clipped = VK_TRUE;
+	createInfo.oldSwapchain = VK_NULL_HANDLE;
+	ERROR_CHECK(vkCreateSwapchainKHR(device, &createInfo, nullptr,
+									 &swapChain) != VK_SUCCESS,
+				"Failed to create swap chain!");
+
+	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+	swapChainImages.resize(imageCount);
+	vkGetSwapchainImagesKHR(device, swapChain, &imageCount,
+							swapChainImages.data());
+	swapChainImageFormat = surfaceFormat.format;
+	swapChainExtent = extent;
+}
+
+bool VulkanPlayApp::checkDeviceExtensionSupport(VkPhysicalDevice device) {
+	uint32_t extensionCount;
+	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
+										 nullptr);
+
+	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
+										 availableExtensions.data());
+
+	std::set<std::string> requiredExtensions(deviceExtensions.begin(),
+											 deviceExtensions.end());
+
+	for (const auto &extension : availableExtensions) {
+		requiredExtensions.erase(extension.extensionName);
+	}
+
+	return requiredExtensions.empty();
+}
+
+int VulkanPlayApp::rateDeviceSuitability(VkPhysicalDevice device) {
+	VkPhysicalDeviceProperties deviceProperties;
+	vkGetPhysicalDeviceProperties(device, &deviceProperties);
+	VkPhysicalDeviceFeatures deviceFeatures;
+	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+	int score = 0;
+
+	// Discrete GPUs have a significant performance advantage
+	if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+		score += 1000;
+	}
+
+	// Maximum possible size of textures affects graphics quality
+	score += deviceProperties.limits.maxImageDimension2D;
+	// if (!deviceFeatures.geometryShader) {
+	// 	return 0;
+	// }
+
+	QueueFamilyIndices indices = findQueueFamilies(device);
+	if (!indices.isComplete()) return 0;
+
+	bool extensionsSupported = checkDeviceExtensionSupport(device);
+	if (!extensionsSupported) return 0;
+
+	bool swapChainAdequate = false;
+	if (extensionsSupported) {
+		SwapChainSupportDetails swapChainSupport =
+			querySwapChainSupport(device);
+		swapChainAdequate = !swapChainSupport.formats.empty() &&
+							!swapChainSupport.presentModes.empty();
+	}
+	if (!swapChainAdequate) return 0;
+
+	return score;
+}
+
+VkSurfaceFormatKHR VulkanPlayApp::chooseSwapSurfaceFormat(
+	const std::vector<VkSurfaceFormatKHR> &availableFormats) {
+	for (const auto &availableFormat : availableFormats) {
+		if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+			availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+			return availableFormat;
+		}
+	}
+
+	return availableFormats[0];
+}
+
+VkPresentModeKHR VulkanPlayApp::chooseSwapPresentMode(
+	const std::vector<VkPresentModeKHR> &availablePresentModes) {
+	for (const auto &availablePresentMode : availablePresentModes) {
+		if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+			return availablePresentMode;
+		}
+	}
+
+	return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D VulkanPlayApp::chooseSwapExtent(
+	const VkSurfaceCapabilitiesKHR &capabilities) {
+	if (capabilities.currentExtent.width != UINT32_MAX) {
+		return capabilities.currentExtent;
+	} else {
+		VkExtent2D actualExtent = {WIDTH, HEIGHT};
+
+		actualExtent.width = std::max(
+			capabilities.minImageExtent.width,
+			std::min(capabilities.maxImageExtent.width, actualExtent.width));
+		actualExtent.height = std::max(
+			capabilities.minImageExtent.height,
+			std::min(capabilities.maxImageExtent.height, actualExtent.height));
+
+		return actualExtent;
+	}
+}
+
+SwapChainSupportDetails VulkanPlayApp::querySwapChainSupport(
+	VkPhysicalDevice device) {
+	SwapChainSupportDetails details;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface,
+											  &details.capabilities);
+	uint32_t formatCount;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
+										 nullptr);
+
+	if (formatCount != 0) {
+		details.formats.resize(formatCount);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount,
+											 details.formats.data());
+	}
+
+	uint32_t presentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface,
+											  &presentModeCount, nullptr);
+
+	if (presentModeCount != 0) {
+		details.presentModes.resize(presentModeCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(
+			device, surface, &presentModeCount, details.presentModes.data());
+	}
+
+	return details;
 }
 
 QueueFamilyIndices VulkanPlayApp::findQueueFamilies(VkPhysicalDevice device) {
@@ -170,7 +327,9 @@ void VulkanPlayApp::createLogicalDevice() {
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
 	createInfo.pEnabledFeatures = &deviceFeatures;
-	createInfo.enabledExtensionCount = 0;
+	createInfo.enabledExtensionCount =
+		static_cast<uint32_t>(deviceExtensions.size());
+	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
 	if (enableValidationLayers) {
 		createInfo.enabledLayerCount =
@@ -318,6 +477,7 @@ void VulkanPlayApp::mainLoop() {
 }
 
 void VulkanPlayApp::cleanup() {
+	vkDestroySwapchainKHR(device, swapChain, nullptr);
 	vkDestroyDevice(device, nullptr);
 	if (enableValidationLayers) {
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
