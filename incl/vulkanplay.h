@@ -27,6 +27,7 @@ const bool enableValidationLayers = true;
 
 struct QueueFamilyIndices {
 	optional<uint32_t> graphicsFamily;
+	optional<uint32_t> presentFamily;
 	bool isComplete();
 };
 
@@ -48,6 +49,7 @@ class VulkanPlayApp {
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device;
 	VkQueue graphicsQueue;
+	VkQueue presentQueue;
 
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
@@ -56,8 +58,10 @@ class VulkanPlayApp {
 	void createVulkanSurface();
 	bool validVulkanExtensions(vector<const char *> extensionNames);
 	bool checkValidationLayerSupport();
+	int rateDeviceSuitability(VkPhysicalDevice device);
 	void pickPhysicalDevice();
 	void createLogicalDevice();
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	void mainLoop();
 	void cleanup();
 };

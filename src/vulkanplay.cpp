@@ -3,33 +3,13 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
+#include <set>
 #include <vector>
 
 using namespace std;
 
-bool QueueFamilyIndices::isComplete() { return graphicsFamily.has_value(); }
-
-static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
-	QueueFamilyIndices indices;
-	uint32_t queueFamilyCount = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
-											 nullptr);
-
-	vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
-											 queueFamilies.data());
-
-	int i = 0;
-	for (const auto &queueFamily : queueFamilies) {
-		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			indices.graphicsFamily = i;
-		}
-		if (indices.isComplete()) {
-			break;
-		}
-		i++;
-	}
-	return indices;
+bool QueueFamilyIndices::isComplete() {
+	return graphicsFamily.has_value() && presentFamily.has_value();
 }
 
 static std::vector<const char *> getRequiredExtensions(SDL_Window *window) {
@@ -86,7 +66,7 @@ static void populateDebugMessengerCreateInfo(
 	createInfo.pfnUserCallback = VulkanPlayApp::debugCallback;
 }
 
-static int rateDeviceSuitability(VkPhysicalDevice device) {
+int VulkanPlayApp::rateDeviceSuitability(VkPhysicalDevice device) {
 	VkPhysicalDeviceProperties deviceProperties;
 	vkGetPhysicalDeviceProperties(device, &deviceProperties);
 	VkPhysicalDeviceFeatures deviceFeatures;
@@ -135,21 +115,59 @@ void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 	cleanup();
 }
 
+QueueFamilyIndices VulkanPlayApp::findQueueFamilies(VkPhysicalDevice device) {
+	QueueFamilyIndices indices;
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
+											 nullptr);
+
+	vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
+											 queueFamilies.data());
+
+	int i = 0;
+	for (const auto &queueFamily : queueFamilies) {
+		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+			indices.graphicsFamily = i;
+		}
+		if (indices.isComplete()) {
+			break;
+		}
+		VkBool32 presentSupport = false;
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface,
+											 &presentSupport);
+		if (presentSupport) {
+			indices.presentFamily = i;
+		}
+		i++;
+	}
+	return indices;
+}
+
 void VulkanPlayApp::createLogicalDevice() {
 	QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
-	VkDeviceQueueCreateInfo queueCreateInfo{};
-	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-	queueCreateInfo.queueCount = 1;
+	vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+	set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(),
+										 indices.presentFamily.value()};
+
 	float queuePriority = 1.0f;
-	queueCreateInfo.pQueuePriorities = &queuePriority;
+	for (uint32_t queueFamily : uniqueQueueFamilies) {
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = queueFamily;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+		queueCreateInfos.push_back(queueCreateInfo);
+	}
+
 	VkPhysicalDeviceFeatures deviceFeatures{};
 
 	VkDeviceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	createInfo.pQueueCreateInfos = &queueCreateInfo;
-	createInfo.queueCreateInfoCount = 1;
+	createInfo.queueCreateInfoCount =
+		static_cast<uint32_t>(queueCreateInfos.size());
+	createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
 	createInfo.pEnabledFeatures = &deviceFeatures;
 	createInfo.enabledExtensionCount = 0;
@@ -165,6 +183,7 @@ void VulkanPlayApp::createLogicalDevice() {
 					VK_SUCCESS,
 				"Failed to create logical device!");
 	vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+	vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
 void VulkanPlayApp::pickPhysicalDevice() {
