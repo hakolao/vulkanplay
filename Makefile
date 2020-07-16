@@ -19,7 +19,7 @@ INCL = -I ./incl -I $(LIBCPP_MATRIX)/incl \
 		-I$(LIBSDL2)/SDL2_image.framework/Headers \
 		-I$(LIBSDL2)/SDL2_ttf.framework/Headers
 
-FLAGS = -Wall -Wextra -Werror -O2 -std=c++11
+FLAGS = -Wall -Wextra -Werror -O2 -std=c++17
 SOURCES = main.cpp \
 			vulkanplay.cpp
 

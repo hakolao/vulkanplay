@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <vulkan/vulkan.h>
 
+#include <optional>
 #include <vector>
 
 #include "libcpp_matrix.h"
@@ -24,6 +25,11 @@ const bool enableValidationLayers = true;
 		if ((test)) throw std::runtime_error(message); \
 	} while (0)
 
+struct QueueFamilyIndices {
+	optional<uint32_t> graphicsFamily;
+	bool isComplete();
+};
+
 class VulkanPlayApp {
    public:
 	void run(uint32_t width, uint32_t height, const char *name);
@@ -39,15 +45,18 @@ class VulkanPlayApp {
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkSurfaceKHR surface;
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
 	void createVulkanInstance(const char *name);
 	void setupDebugMessenger();
 	void createVulkanSurface();
-	void mainLoop();
-	void cleanup();
 	bool validVulkanExtensions(vector<const char *> extensionNames);
 	bool checkValidationLayerSupport();
+	void pickPhysicalDevice();
+	void mainLoop();
+	void cleanup();
 };
 
 #endif

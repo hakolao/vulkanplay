@@ -2,9 +2,35 @@
 
 #include <algorithm>
 #include <iostream>
+#include <map>
 #include <vector>
 
 using namespace std;
+
+bool QueueFamilyIndices::isComplete() { return graphicsFamily.has_value(); }
+
+static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+	QueueFamilyIndices indices;
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
+											 nullptr);
+
+	vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount,
+											 queueFamilies.data());
+
+	int i = 0;
+	for (const auto &queueFamily : queueFamilies) {
+		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+			indices.graphicsFamily = i;
+		}
+		if (indices.isComplete()) {
+			break;
+		}
+		i++;
+	}
+	return indices;
+}
 
 static std::vector<const char *> getRequiredExtensions(SDL_Window *window) {
 	uint32_t extensionCount = 0;
@@ -46,6 +72,44 @@ static void DestroyDebugUtilsMessengerEXT(
 	}
 }
 
+static void populateDebugMessengerCreateInfo(
+	VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
+	createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+	createInfo.messageSeverity =
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+	createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+							 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+							 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	createInfo.pfnUserCallback = VulkanPlayApp::debugCallback;
+}
+
+static int rateDeviceSuitability(VkPhysicalDevice device) {
+	VkPhysicalDeviceProperties deviceProperties;
+	vkGetPhysicalDeviceProperties(device, &deviceProperties);
+	VkPhysicalDeviceFeatures deviceFeatures;
+	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+	int score = 0;
+
+	// Discrete GPUs have a significant performance advantage
+	if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+		score += 1000;
+	}
+
+	// Maximum possible size of textures affects graphics quality
+	score += deviceProperties.limits.maxImageDimension2D;
+	// if (!deviceFeatures.geometryShader) {
+	// 	return 0;
+	// }
+
+	QueueFamilyIndices indices = findQueueFamilies(device);
+	if (!indices.isComplete()) return 0;
+
+	return score;
+}
+
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanPlayApp::debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -62,25 +126,31 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanPlayApp::debugCallback(
 
 void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 	ERROR_CHECK(SDL_Init(SDL_INIT_VIDEO) != 0, SDL_GetError());
-	this->initWindow(width, height, name);
-	this->initVulkan(name);
-	this->setupDebugMessenger();
-	this->mainLoop();
-	this->cleanup();
+	initWindow(width, height, name);
+	initVulkan(name);
+	setupDebugMessenger();
+	pickPhysicalDevice();
+	mainLoop();
+	cleanup();
 }
 
-void populateDebugMessengerCreateInfo(
-	VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
-	createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-	createInfo.messageSeverity =
-		VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-		VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-							 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-							 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	createInfo.pfnUserCallback = VulkanPlayApp::debugCallback;
+void VulkanPlayApp::pickPhysicalDevice() {
+	uint32_t deviceCount = 0;
+	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+	ERROR_CHECK(deviceCount == 0, "Failed to find GPUs with Vulkan support!");
+	vector<VkPhysicalDevice> devices(deviceCount);
+	vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+	std::multimap<int, VkPhysicalDevice> candidates;
+
+	for (const auto &device : devices) {
+		int score = rateDeviceSuitability(device);
+		candidates.insert(std::make_pair(score, device));
+	}
+	// Check if the best candidate is suitable at all
+	if (candidates.rbegin()->first > 0)
+		physicalDevice = candidates.rbegin()->second;
+	else
+		ERROR_CHECK(true, "Failed to find a suitable GPU!");
 }
 
 void VulkanPlayApp::setupDebugMessenger() {
