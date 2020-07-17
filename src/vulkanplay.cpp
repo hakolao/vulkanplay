@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <set>
@@ -81,17 +82,20 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanPlayApp::debugCallback(
 	return VK_FALSE;
 }
 
-void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
-	ERROR_CHECK(SDL_Init(SDL_INIT_VIDEO) != 0, SDL_GetError());
-	initWindow(width, height, name);
-	initVulkan(name);
-	setupDebugMessenger();
-	pickPhysicalDevice();
-	createLogicalDevice();
-	createSwapChain();
-	createImageViews();
-	mainLoop();
-	cleanup();
+vector<char> VulkanPlayApp::readFile(const std::string &filename) {
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+	if (!file.is_open()) {
+		throw std::runtime_error("failed to open file!");
+	}
+
+	size_t fileSize = (size_t)file.tellg();
+	vector<char> buffer(fileSize);
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+	file.close();
+
+	return buffer;
 }
 
 void VulkanPlayApp::createImageViews() {
@@ -397,11 +401,6 @@ void VulkanPlayApp::setupDebugMessenger() {
 				"failed to set up debug messenger!");
 }
 
-void VulkanPlayApp::initVulkan(const char *name) {
-	createVulkanInstance(name);
-	createVulkanSurface();
-}
-
 void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
 							   const char *name) {
 	window = SDL_CreateWindow(name, SDL_WINDOWPOS_CENTERED,
@@ -490,6 +489,19 @@ void VulkanPlayApp::createVulkanSurface() {
 				"Failed to create a Vulkan surface");
 }
 
+VkShaderModule VulkanPlayApp::createShaderModule(
+	const std::vector<char> &code) {
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+	VkShaderModule shaderModule;
+	ERROR_CHECK(vkCreateShaderModule(device, &createInfo, nullptr,
+									 &shaderModule) != VK_SUCCESS,
+				"Failed to create shader module!");
+	return shaderModule;
+}
+
 void VulkanPlayApp::mainLoop() {
 	while (isRunning) {
 		SDL_Event event;
@@ -498,6 +510,53 @@ void VulkanPlayApp::mainLoop() {
 		}
 		// draw_frame();
 	}
+}
+
+void VulkanPlayApp::initVulkan(const char *name) {
+	createVulkanInstance(name);
+	createVulkanSurface();
+	setupDebugMessenger();
+	pickPhysicalDevice();
+	createLogicalDevice();
+	createSwapChain();
+	createImageViews();
+	createGraphicsPipeline();
+}
+
+void VulkanPlayApp::createGraphicsPipeline() {
+	auto vertShaderCode = readFile("shaders/vert.spv");
+	auto fragShaderCode = readFile("shaders/frag.spv");
+	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+	vertShaderStageInfo.sType =
+		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+	fragShaderStageInfo.sType =
+		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo,
+													  fragShaderStageInfo};
+	(void)shaderStages;
+	vkDestroyShaderModule(device, fragShaderModule, nullptr);
+	vkDestroyShaderModule(device, vertShaderModule, nullptr);
+}
+
+void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
+	ERROR_CHECK(SDL_Init(SDL_INIT_VIDEO) != 0, SDL_GetError());
+	initWindow(width, height, name);
+	initVulkan(name);
+	mainLoop();
+	cleanup();
 }
 
 void VulkanPlayApp::cleanup() {

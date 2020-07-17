@@ -51,6 +51,7 @@ class VulkanPlayApp {
 				  VkDebugUtilsMessageTypeFlagsEXT messageType,
 				  const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
 				  void *pUserData);
+	static std::vector<char> readFile(const std::string &filename);
 
    private:
 	// Todo Add width and height that change on resize
@@ -88,6 +89,8 @@ class VulkanPlayApp {
 	void createLogicalDevice();
 	void createSwapChain();
 	void createImageViews();
+	void createGraphicsPipeline();
+	VkShaderModule createShaderModule(const std::vector<char> &code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	void mainLoop();
 	void cleanup();
