@@ -684,6 +684,27 @@ void VulkanPlayApp::createRenderPass() {
 				"Failed to create render pass!");
 }
 
+void VulkanPlayApp::createFramebuffers() {
+	swapChainFramebuffers.resize(swapChainImageViews.size());
+	for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+		VkImageView attachments[] = {swapChainImageViews[i]};
+
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = renderPass;
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = attachments;
+		framebufferInfo.width = swapChainExtent.width;
+		framebufferInfo.height = swapChainExtent.height;
+		framebufferInfo.layers = 1;
+
+		ERROR_CHECK(
+			vkCreateFramebuffer(device, &framebufferInfo, nullptr,
+								&swapChainFramebuffers[i]) != VK_SUCCESS,
+			"Failed to create framebuffer");
+	}
+}
+
 void VulkanPlayApp::mainLoop() {
 	while (isRunning) {
 		SDL_Event event;
@@ -704,6 +725,7 @@ void VulkanPlayApp::initVulkan(const char *name) {
 	createImageViews();
 	createRenderPass();
 	createGraphicsPipeline();
+	createFramebuffers();
 }
 
 void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
@@ -715,6 +737,9 @@ void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 }
 
 void VulkanPlayApp::cleanup() {
+	for (auto framebuffer : swapChainFramebuffers) {
+		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	}
 	vkDestroyPipeline(device, graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 	vkDestroyRenderPass(device, renderPass, nullptr);
