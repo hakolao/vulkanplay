@@ -14,6 +14,7 @@
 #define WIDTH 1280
 #define HEIGHT 720
 
+const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char *> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"};
 
@@ -75,9 +76,12 @@ class VulkanPlayApp {
 	vector<VkFramebuffer> swapChainFramebuffers;
 	VkCommandPool commandPool;
 	vector<VkCommandBuffer> commandBuffers;
+	vector<VkSemaphore> imageAvailableSemaphores;
+	vector<VkSemaphore> renderFinishedSemaphores;
+	vector<VkFence> inFlightFences;
+	vector<VkFence> imagesInFlight;
+	size_t currentFrame = 0;
 
-	void initWindow(uint32_t width, uint32_t height, const char *name);
-	void initVulkan(const char *name);
 	void createVulkanInstance(const char *name);
 	void setupDebugMessenger();
 	void createVulkanSurface();
@@ -91,6 +95,8 @@ class VulkanPlayApp {
 	VkPresentModeKHR chooseSwapPresentMode(
 		const std::vector<VkPresentModeKHR> &availablePresentModes);
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
+	VkShaderModule createShaderModule(const std::vector<char> &code);
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	void pickPhysicalDevice();
 	void createLogicalDevice();
 	void createSwapChain();
@@ -100,9 +106,11 @@ class VulkanPlayApp {
 	void createFramebuffers();
 	void createCommandPool();
 	void createCommandBuffers();
-	VkShaderModule createShaderModule(const std::vector<char> &code);
-	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+	void createSyncObjects();
+	void initWindow(uint32_t width, uint32_t height, const char *name);
+	void initVulkan(const char *name);
 	void mainLoop();
+	void drawFrame();
 	void cleanup();
 };
 
