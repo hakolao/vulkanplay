@@ -71,6 +71,7 @@ class VulkanPlayApp {
 	vector<VkImageView> swapChainImageViews;
 	VkRenderPass renderPass;
 	VkPipelineLayout pipelineLayout;
+	VkPipeline graphicsPipeline;
 
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
