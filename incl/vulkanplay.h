@@ -45,13 +45,15 @@ struct SwapChainSupportDetails {
 };
 
 struct WindowData {
-	SDL_Window *window;
-	void *dataPointer;
+	uint32_t windowId;
+	bool isHidden = false;
+	void *parent;
 };
 
 class VulkanPlayApp {
    public:
 	bool framebufferResized = false;
+	WindowData windowData;
 
 	void run(uint32_t width, uint32_t height, const char *name);
 	static VKAPI_ATTR VkBool32 VKAPI_CALL

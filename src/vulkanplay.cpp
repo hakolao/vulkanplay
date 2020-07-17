@@ -14,14 +14,21 @@ bool QueueFamilyIndices::isComplete() {
 	return graphicsFamily.has_value() && presentFamily.has_value();
 }
 
-static int framebufferResizeCallback(void *windowData, SDL_Event *event) {
+static int framebufferResizeCallback(void *data, SDL_Event *event) {
 	if (event->type == SDL_WINDOWEVENT &&
-		event->window.event == SDL_WINDOWEVENT_RESIZED) {
-		SDL_Window *window = SDL_GetWindowFromID(event->window.windowID);
-		if (window == ((WindowData *)windowData)->window) {
-			auto app = reinterpret_cast<VulkanPlayApp *>(
-				((WindowData *)windowData)->dataPointer);
+		(event->window.event == SDL_WINDOWEVENT_RESIZED ||
+		 event->window.event == SDL_WINDOWEVENT_MINIMIZED ||
+		 event->window.event == SDL_WINDOWEVENT_MAXIMIZED ||
+		 event->window.event == SDL_WINDOWEVENT_SHOWN ||
+		 event->window.event == SDL_WINDOWEVENT_HIDDEN)) {
+		WindowData *windowData = (WindowData *)data;
+		if (event->window.windowID == windowData->windowId) {
+			auto app = (VulkanPlayApp *)(windowData->parent);
 			app->framebufferResized = true;
+			if (event->window.event == SDL_WINDOWEVENT_HIDDEN)
+				windowData->isHidden = true;
+			else if (event->window.event == SDL_WINDOWEVENT_SHOWN)
+				windowData->isHidden = false;
 		}
 	}
 	return 0;
@@ -422,7 +429,10 @@ void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
 							  SDL_WINDOWPOS_CENTERED, width, height,
 							  SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 	ERROR_CHECK(window == NULL, SDL_GetError());
-	WindowData windowData = {.window = window, .dataPointer = this};
+	uint32_t windowId = SDL_GetWindowID(window);
+	windowData.windowId = windowId;
+	windowData.parent = this;
+	windowData.isHidden = false;
 	SDL_AddEventWatch(framebufferResizeCallback, &windowData);
 }
 
@@ -899,6 +909,11 @@ void VulkanPlayApp::drawFrame() {
 }
 
 void VulkanPlayApp::recreateSwapChain() {
+	// Ignore events while minimized
+	while (windowData.isHidden) {
+		SDL_PollEvent(nullptr);
+	}
+
 	vkDeviceWaitIdle(device);
 
 	cleanupSwapChain();
