@@ -423,10 +423,9 @@ void VulkanPlayApp::setupDebugMessenger() {
 				"failed to set up debug messenger!");
 }
 
-void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
-							   const char *name) {
-	window = SDL_CreateWindow(name, SDL_WINDOWPOS_CENTERED,
-							  SDL_WINDOWPOS_CENTERED, width, height,
+void VulkanPlayApp::initWindow() {
+	window = SDL_CreateWindow(NAME, SDL_WINDOWPOS_CENTERED,
+							  SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT,
 							  SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 	ERROR_CHECK(window == NULL, SDL_GetError());
 	uint32_t windowId = SDL_GetWindowID(window);
@@ -473,7 +472,7 @@ bool VulkanPlayApp::checkValidationLayerSupport() {
 	return true;
 }
 
-void VulkanPlayApp::createVulkanInstance(const char *name) {
+void VulkanPlayApp::createVulkanInstance() {
 	ERROR_CHECK(enableValidationLayers && !checkValidationLayerSupport(),
 				"validation layers requested, but not available!");
 	auto extensionNames = getRequiredExtensions(window);
@@ -481,7 +480,7 @@ void VulkanPlayApp::createVulkanInstance(const char *name) {
 				"Some SDL vulkan extensions not found in availalbe extensions");
 
 	VkApplicationInfo appInfo = {};
-	appInfo.pApplicationName = name;
+	appInfo.pApplicationName = NAME;
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.pEngineName = "No Engine";
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -798,8 +797,8 @@ void VulkanPlayApp::createCommandBuffers() {
 	}
 }
 
-void VulkanPlayApp::initVulkan(const char *name) {
-	createVulkanInstance(name);
+void VulkanPlayApp::initVulkan() {
+	createVulkanInstance();
 	createVulkanSurface();
 	setupDebugMessenger();
 	pickPhysicalDevice();
@@ -937,10 +936,10 @@ void VulkanPlayApp::mainLoop() {
 	vkDeviceWaitIdle(device);
 }
 
-void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
+void VulkanPlayApp::run() {
 	ERROR_CHECK(SDL_Init(SDL_INIT_VIDEO) != 0, SDL_GetError());
-	initWindow(width, height, name);
-	initVulkan(name);
+	initWindow();
+	initVulkan();
 	mainLoop();
 	cleanup();
 }

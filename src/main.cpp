@@ -8,7 +8,7 @@ int main(void) {
 	VulkanPlayApp app;
 
 	try {
-		app.run(WIDTH, HEIGHT, "Vulkan Play");
+		app.run();
 	} catch (const std::exception& e) {
 		std::cerr << e.what() << std::endl;
 		return EXIT_FAILURE;

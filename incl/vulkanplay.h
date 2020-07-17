@@ -13,6 +13,7 @@
 
 #define WIDTH 1280
 #define HEIGHT 720
+#define NAME "Vulkan Play"
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char *> validationLayers = {
@@ -55,7 +56,7 @@ class VulkanPlayApp {
 	bool framebufferResized = false;
 	WindowData windowData;
 
-	void run(uint32_t width, uint32_t height, const char *name);
+	void run();
 	static VKAPI_ATTR VkBool32 VKAPI_CALL
 	debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 				  VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -91,7 +92,7 @@ class VulkanPlayApp {
 	vector<VkFence> imagesInFlight;
 	size_t currentFrame = 0;
 
-	void createVulkanInstance(const char *name);
+	void createVulkanInstance();
 	void setupDebugMessenger();
 	void createVulkanSurface();
 	bool validVulkanExtensions(vector<const char *> extensionNames);
@@ -117,8 +118,8 @@ class VulkanPlayApp {
 	void createCommandPool();
 	void createCommandBuffers();
 	void createSyncObjects();
-	void initWindow(uint32_t width, uint32_t height, const char *name);
-	void initVulkan(const char *name);
+	void initWindow();
+	void initVulkan();
 	void mainLoop();
 	void drawFrame();
 	void cleanup();
