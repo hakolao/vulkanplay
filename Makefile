@@ -29,9 +29,13 @@ OBJS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.cpp=.o))
 all: $(DIR_OBJ) $(NAME)
 
 $(NAME): $(OBJS)
-	@make -C $(LIBCPP_MATRIX)
+	@printf "\033[32;1mCompiling libs...\n\033[0m"
+	make -C $(LIBCPP_MATRIX)
+	@printf "\033[32;1mCompiling shaders...\n\033[0m"
 	cd shaders && /bin/sh compile.sh && cd ..
+	@printf "\033[32;1mCompiling app...\n\033[0m"
 	$(CC) $(FLAGS) $(LIBCPP_MATRIX_FLAGS) $(VULKAN_FLAGS) -o $@ $^
+	@printf "\033[32;1mDone. Run: ./$(NAME)\n\033[0m"
 
 $(DIR_OBJ):
 	@mkdir -p temp
