@@ -43,7 +43,7 @@ struct VulkanVertex {
 };
 
 const std::vector<VulkanVertex> vertices = {
-	{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
 	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
 	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
 
@@ -154,6 +154,10 @@ class VulkanPlayApp {
 	void createCommandBuffers();
 	void createSyncObjects();
 	void createVertexBuffer();
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+					  VkMemoryPropertyFlags properties, VkBuffer &buffer,
+					  VkDeviceMemory &bufferMemory);
+	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
