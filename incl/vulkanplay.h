@@ -73,6 +73,8 @@ class VulkanPlayApp {
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 	vector<VkFramebuffer> swapChainFramebuffers;
+	VkCommandPool commandPool;
+	vector<VkCommandBuffer> commandBuffers;
 
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
@@ -96,6 +98,8 @@ class VulkanPlayApp {
 	void createRenderPass();
 	void createGraphicsPipeline();
 	void createFramebuffers();
+	void createCommandPool();
+	void createCommandBuffers();
 	VkShaderModule createShaderModule(const std::vector<char> &code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	void mainLoop();
