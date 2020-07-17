@@ -6,14 +6,26 @@
 #include <stdio.h>
 #include <vulkan/vulkan.h>
 
+#include <array>
+// ToDo don't use glm...
+#include <glm/glm.hpp>
 #include <optional>
 #include <vector>
 
-#include "libcpp_matrix.h"
+using namespace std;
+
+// ToDo use own libcpp matrix
+// #include "libcpp_matrix.h"
 
 #define WIDTH 1280
 #define HEIGHT 720
 #define NAME "Vulkan Play"
+
+#ifdef NDEBUG
+const bool enableValidationLayers = false;
+#else
+const bool enableValidationLayers = true;
+#endif
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char *> validationLayers = {
@@ -22,11 +34,23 @@ const std::vector<const char *> validationLayers = {
 const std::vector<const char *> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-#ifdef NDEBUG
-const bool enableValidationLayers = false;
-#else
-const bool enableValidationLayers = true;
-#endif
+struct VulkanVertex {
+	glm::vec2 pos;
+	glm::vec3 color;
+	static VkVertexInputBindingDescription getBindingDescription();
+	static std::array<VkVertexInputAttributeDescription, 2>
+	getAttributeDescriptions();
+};
+
+const std::vector<VulkanVertex> vertices = {
+	{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
+
+// const std::vector<Vertex> vertices = {
+// 	Vertex(0.0f, -0.5f, 0.0f, Color(1.0f, 0.0f, 0.0f)),
+// 	Vertex(0.5f, 0.5f, 0.0f, Color(0.0f, 1.0f, 0.0f)),
+// 	Vertex(-0.5f, 0.5f, 0.0f, Color(0.0f, 0.0f, 1.0f))};
 
 #define ERROR_CHECK(test, message)                     \
 	do {                                               \
@@ -65,31 +89,40 @@ class VulkanPlayApp {
 	static std::vector<char> readFile(const std::string &filename);
 
    private:
-	// Todo Add width and height that change on resize
 	bool isRunning = true;
 	SDL_Window *window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkSurfaceKHR surface;
+
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device;
+
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
+
 	VkSwapchainKHR swapChain;
-	vector<VkImage> swapChainImages;
+	std::vector<VkImage> swapChainImages;
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
-	vector<VkImageView> swapChainImageViews;
+	std::vector<VkImageView> swapChainImageViews;
+	std::vector<VkFramebuffer> swapChainFramebuffers;
+
 	VkRenderPass renderPass;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
-	vector<VkFramebuffer> swapChainFramebuffers;
+
 	VkCommandPool commandPool;
-	vector<VkCommandBuffer> commandBuffers;
-	vector<VkSemaphore> imageAvailableSemaphores;
-	vector<VkSemaphore> renderFinishedSemaphores;
-	vector<VkFence> inFlightFences;
-	vector<VkFence> imagesInFlight;
+
+	VkBuffer vertexBuffer;
+	VkDeviceMemory vertexBufferMemory;
+
+	std::vector<VkCommandBuffer> commandBuffers;
+
+	std::vector<VkSemaphore> imageAvailableSemaphores;
+	std::vector<VkSemaphore> renderFinishedSemaphores;
+	std::vector<VkFence> inFlightFences;
+	std::vector<VkFence> imagesInFlight;
 	size_t currentFrame = 0;
 
 	void createVulkanInstance();
@@ -107,6 +140,8 @@ class VulkanPlayApp {
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 	VkShaderModule createShaderModule(const std::vector<char> &code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+	uint32_t findMemoryType(uint32_t typeFilter,
+							VkMemoryPropertyFlags properties);
 	void pickPhysicalDevice();
 	void createLogicalDevice();
 	void createSwapChain();
@@ -118,6 +153,7 @@ class VulkanPlayApp {
 	void createCommandPool();
 	void createCommandBuffers();
 	void createSyncObjects();
+	void createVertexBuffer();
 	void initWindow();
 	void initVulkan();
 	void mainLoop();

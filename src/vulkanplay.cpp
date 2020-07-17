@@ -8,7 +8,29 @@
 #include <set>
 #include <vector>
 
-using namespace std;
+VkVertexInputBindingDescription VulkanVertex::getBindingDescription() {
+	VkVertexInputBindingDescription bindingDescription{};
+	bindingDescription.binding = 0;
+	bindingDescription.stride = sizeof(VulkanVertex);
+	bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	return bindingDescription;
+}
+
+std::array<VkVertexInputAttributeDescription, 2>
+VulkanVertex::getAttributeDescriptions() {
+	std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+	attributeDescriptions[0].binding = 0;
+	attributeDescriptions[0].location = 0;
+	attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+	attributeDescriptions[0].offset = offsetof(VulkanVertex, pos);
+
+	attributeDescriptions[1].binding = 0;
+	attributeDescriptions[1].location = 1;
+	attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attributeDescriptions[1].offset = offsetof(VulkanVertex, color);
+	return attributeDescriptions;
+}
 
 bool QueueFamilyIndices::isComplete() {
 	return graphicsFamily.has_value() && presentFamily.has_value();
@@ -88,6 +110,22 @@ static void populateDebugMessengerCreateInfo(
 	createInfo.pfnUserCallback = VulkanPlayApp::debugCallback;
 }
 
+uint32_t VulkanPlayApp::findMemoryType(uint32_t typeFilter,
+									   VkMemoryPropertyFlags properties) {
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+		if ((typeFilter & (1 << i)) &&
+			(memProperties.memoryTypes[i].propertyFlags & properties) ==
+				properties) {
+			return i;
+		}
+	}
+
+	ERROR_CHECK(true, "Failed to find suitable memory type!");
+}
+
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanPlayApp::debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -135,6 +173,7 @@ void VulkanPlayApp::createImageViews() {
 		createInfo.subresourceRange.levelCount = 1;
 		createInfo.subresourceRange.baseArrayLayer = 0;
 		createInfo.subresourceRange.layerCount = 1;
+
 		ERROR_CHECK(vkCreateImageView(device, &createInfo, nullptr,
 									  &swapChainImageViews[i]) != VK_SUCCESS,
 					"Failed to create image views!");
@@ -176,14 +215,12 @@ void VulkanPlayApp::createSwapChain() {
 		createInfo.pQueueFamilyIndices = queueFamilyIndices;
 	} else {
 		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		createInfo.queueFamilyIndexCount = 0;	   // Optional
-		createInfo.pQueueFamilyIndices = nullptr;  // Optional
 	}
 	createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
 	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	createInfo.presentMode = presentMode;
 	createInfo.clipped = VK_TRUE;
-	createInfo.oldSwapchain = VK_NULL_HANDLE;
+
 	ERROR_CHECK(vkCreateSwapchainKHR(device, &createInfo, nullptr,
 									 &swapChain) != VK_SUCCESS,
 				"Failed to create swap chain!");
@@ -521,6 +558,7 @@ VkShaderModule VulkanPlayApp::createShaderModule(
 	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	createInfo.codeSize = code.size();
 	createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+
 	VkShaderModule shaderModule;
 	ERROR_CHECK(vkCreateShaderModule(device, &createInfo, nullptr,
 									 &shaderModule) != VK_SUCCESS,
@@ -531,6 +569,7 @@ VkShaderModule VulkanPlayApp::createShaderModule(
 void VulkanPlayApp::createGraphicsPipeline() {
 	auto vertShaderCode = readFile("shaders/vert.spv");
 	auto fragShaderCode = readFile("shaders/frag.spv");
+
 	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
 	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
@@ -538,7 +577,6 @@ void VulkanPlayApp::createGraphicsPipeline() {
 	vertShaderStageInfo.sType =
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-
 	vertShaderStageInfo.module = vertShaderModule;
 	vertShaderStageInfo.pName = "main";
 
@@ -555,10 +593,15 @@ void VulkanPlayApp::createGraphicsPipeline() {
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType =
 		VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr;  // Optional
-	vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = nullptr;	 // Optional
+
+	auto bindingDescription = VulkanVertex::getBindingDescription();
+	auto attributeDescriptions = VulkanVertex::getAttributeDescriptions();
+
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.vertexAttributeDescriptionCount =
+		static_cast<uint32_t>(attributeDescriptions.size());
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType =
@@ -595,59 +638,36 @@ void VulkanPlayApp::createGraphicsPipeline() {
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	rasterizer.depthBiasConstantFactor = 0.0f;	// Optional
-	rasterizer.depthBiasClamp = 0.0f;			// Optional
-	rasterizer.depthBiasSlopeFactor = 0.0f;		// Optional
 
 	VkPipelineMultisampleStateCreateInfo multisampling{};
 	multisampling.sType =
 		VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampling.sampleShadingEnable = VK_FALSE;
 	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	multisampling.minSampleShading = 1.0f;			 // Optional
-	multisampling.pSampleMask = nullptr;			 // Optional
-	multisampling.alphaToCoverageEnable = VK_FALSE;	 // Optional
-	multisampling.alphaToOneEnable = VK_FALSE;		 // Optional
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 	colorBlendAttachment.colorWriteMask =
 		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_TRUE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	colorBlendAttachment.dstColorBlendFactor =
-		VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachment.blendEnable = VK_FALSE;
 
 	VkPipelineColorBlendStateCreateInfo colorBlending{};
 	colorBlending.sType =
 		VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY;  // Optional
+	colorBlending.logicOp = VK_LOGIC_OP_COPY;
 	colorBlending.attachmentCount = 1;
 	colorBlending.pAttachments = &colorBlendAttachment;
-	colorBlending.blendConstants[0] = 0.0f;	 // Optional
-	colorBlending.blendConstants[1] = 0.0f;	 // Optional
-	colorBlending.blendConstants[2] = 0.0f;	 // Optional
-	colorBlending.blendConstants[3] = 0.0f;	 // Optional
-
-	VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT,
-									  VK_DYNAMIC_STATE_LINE_WIDTH};
-
-	VkPipelineDynamicStateCreateInfo dynamicState{};
-	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = 2;
-	dynamicState.pDynamicStates = dynamicStates;
+	colorBlending.blendConstants[0] = 0.0f;
+	colorBlending.blendConstants[1] = 0.0f;
+	colorBlending.blendConstants[2] = 0.0f;
+	colorBlending.blendConstants[3] = 0.0f;
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 0;			   // Optional
-	pipelineLayoutInfo.pSetLayouts = nullptr;		   // Optional
-	pipelineLayoutInfo.pushConstantRangeCount = 0;	   // Optional
-	pipelineLayoutInfo.pPushConstantRanges = nullptr;  // Optional
+	pipelineLayoutInfo.setLayoutCount = 0;
+	pipelineLayoutInfo.pushConstantRangeCount = 0;
+
 	ERROR_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr,
 									   &pipelineLayout) != VK_SUCCESS,
 				"Failed to create pipeline layout!");
@@ -661,14 +681,11 @@ void VulkanPlayApp::createGraphicsPipeline() {
 	pipelineInfo.pViewportState = &viewportState;
 	pipelineInfo.pRasterizationState = &rasterizer;
 	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pDepthStencilState = nullptr;	// Optional
 	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.pDynamicState = nullptr;  // Optional
 	pipelineInfo.layout = pipelineLayout;
 	pipelineInfo.renderPass = renderPass;
 	pipelineInfo.subpass = 0;
-	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;  // Optional
-	pipelineInfo.basePipelineIndex = -1;			   // Optional
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
 	ERROR_CHECK(
 		vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo,
@@ -722,6 +739,7 @@ void VulkanPlayApp::createRenderPass() {
 
 void VulkanPlayApp::createFramebuffers() {
 	swapChainFramebuffers.resize(swapChainImageViews.size());
+
 	for (size_t i = 0; i < swapChainImageViews.size(); i++) {
 		VkImageView attachments[] = {swapChainImageViews[i]};
 
@@ -747,7 +765,7 @@ void VulkanPlayApp::createCommandPool() {
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-	poolInfo.flags = 0;	 // Optional
+
 	ERROR_CHECK(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) !=
 					VK_SUCCESS,
 				"Failed to create command pool!");
@@ -761,6 +779,7 @@ void VulkanPlayApp::createCommandBuffers() {
 	allocInfo.commandPool = commandPool;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
 	ERROR_CHECK(vkAllocateCommandBuffers(device, &allocInfo,
 										 commandBuffers.data()) != VK_SUCCESS,
 				"Failed to allocate command buffers!");
@@ -768,8 +787,6 @@ void VulkanPlayApp::createCommandBuffers() {
 	for (size_t i = 0; i < commandBuffers.size(); i++) {
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = 0;				   // Optional
-		beginInfo.pInheritanceInfo = nullptr;  // Optional
 
 		ERROR_CHECK(
 			vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS,
@@ -781,15 +798,23 @@ void VulkanPlayApp::createCommandBuffers() {
 		renderPassInfo.framebuffer = swapChainFramebuffers[i];
 		renderPassInfo.renderArea.offset = {0, 0};
 		renderPassInfo.renderArea.extent = swapChainExtent;
+
 		VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
 		renderPassInfo.clearValueCount = 1;
 		renderPassInfo.pClearValues = &clearColor;
 
 		vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo,
 							 VK_SUBPASS_CONTENTS_INLINE);
+
 		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
 						  graphicsPipeline);
-		vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+
+		VkBuffer vertexBuffers[] = {vertexBuffer};
+		VkDeviceSize offsets[] = {0};
+		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+		vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1,
+				  0, 0);
 		vkCmdEndRenderPass(commandBuffers[i]);
 
 		ERROR_CHECK(vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS,
@@ -797,10 +822,44 @@ void VulkanPlayApp::createCommandBuffers() {
 	}
 }
 
+void VulkanPlayApp::createVertexBuffer() {
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	ERROR_CHECK(vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer) !=
+					VK_SUCCESS,
+				"Failed to create vertex buffer!");
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex =
+		findMemoryType(memRequirements.memoryTypeBits,
+					   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+						   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	ERROR_CHECK(vkAllocateMemory(device, &allocInfo, nullptr,
+								 &vertexBufferMemory) != VK_SUCCESS,
+				"Failed to allocate vertex buffer memory!");
+
+	vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+
+	void *data;
+	vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+	memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+	vkUnmapMemory(device, vertexBufferMemory);
+}
+
 void VulkanPlayApp::initVulkan() {
 	createVulkanInstance();
-	createVulkanSurface();
 	setupDebugMessenger();
+	createVulkanSurface();
 	pickPhysicalDevice();
 	createLogicalDevice();
 	createSwapChain();
@@ -809,6 +868,7 @@ void VulkanPlayApp::initVulkan() {
 	createGraphicsPipeline();
 	createFramebuffers();
 	createCommandPool();
+	createVertexBuffer();
 	createCommandBuffers();
 	createSyncObjects();
 }
@@ -888,11 +948,12 @@ void VulkanPlayApp::drawFrame() {
 
 	presentInfo.waitSemaphoreCount = 1;
 	presentInfo.pWaitSemaphores = signalSemaphores;
+
 	VkSwapchainKHR swapChains[] = {swapChain};
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = swapChains;
+
 	presentInfo.pImageIndices = &imageIndex;
-	presentInfo.pResults = nullptr;	 // Optional
 
 	result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
@@ -966,6 +1027,9 @@ void VulkanPlayApp::cleanupSwapChain() {
 
 void VulkanPlayApp::cleanup() {
 	cleanupSwapChain();
+
+	vkDestroyBuffer(device, vertexBuffer, nullptr);
+	vkFreeMemory(device, vertexBufferMemory, nullptr);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
