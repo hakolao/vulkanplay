@@ -69,6 +69,7 @@ class VulkanPlayApp {
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 	vector<VkImageView> swapChainImageViews;
+	VkPipelineLayout pipelineLayout;
 
 	void initWindow(uint32_t width, uint32_t height, const char *name);
 	void initVulkan(const char *name);
