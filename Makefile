@@ -30,6 +30,7 @@ all: $(DIR_OBJ) $(NAME)
 
 $(NAME): $(OBJS)
 	@make -C $(LIBCPP_MATRIX)
+	cd shaders && /bin/sh compile.sh && cd ..
 	$(CC) $(FLAGS) $(LIBCPP_MATRIX_FLAGS) $(VULKAN_FLAGS) -o $@ $^
 
 $(DIR_OBJ):
@@ -42,6 +43,7 @@ clean:
 	@/bin/rm -f $(OBJS)
 	@/bin/rm -rf $(DIR_OBJ)
 	@make -C $(LIBCPP_MATRIX) clean
+	@/bin/rm -f shaders/*.spv
 
 fclean: clean
 	@/bin/rm -f $(NAME)
