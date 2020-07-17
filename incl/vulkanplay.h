@@ -44,8 +44,15 @@ struct SwapChainSupportDetails {
 	vector<VkPresentModeKHR> presentModes;
 };
 
+struct WindowData {
+	SDL_Window *window;
+	void *dataPointer;
+};
+
 class VulkanPlayApp {
    public:
+	bool framebufferResized = false;
+
 	void run(uint32_t width, uint32_t height, const char *name);
 	static VKAPI_ATTR VkBool32 VKAPI_CALL
 	debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -100,6 +107,7 @@ class VulkanPlayApp {
 	void pickPhysicalDevice();
 	void createLogicalDevice();
 	void createSwapChain();
+	void recreateSwapChain();
 	void createImageViews();
 	void createRenderPass();
 	void createGraphicsPipeline();
@@ -112,6 +120,7 @@ class VulkanPlayApp {
 	void mainLoop();
 	void drawFrame();
 	void cleanup();
+	void cleanupSwapChain();
 };
 
 #endif

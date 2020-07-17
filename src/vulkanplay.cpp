@@ -14,6 +14,19 @@ bool QueueFamilyIndices::isComplete() {
 	return graphicsFamily.has_value() && presentFamily.has_value();
 }
 
+static int framebufferResizeCallback(void *windowData, SDL_Event *event) {
+	if (event->type == SDL_WINDOWEVENT &&
+		event->window.event == SDL_WINDOWEVENT_RESIZED) {
+		SDL_Window *window = SDL_GetWindowFromID(event->window.windowID);
+		if (window == ((WindowData *)windowData)->window) {
+			auto app = reinterpret_cast<VulkanPlayApp *>(
+				((WindowData *)windowData)->dataPointer);
+			app->framebufferResized = true;
+		}
+	}
+	return 0;
+}
+
 static std::vector<const char *> getRequiredExtensions(SDL_Window *window) {
 	uint32_t extensionCount = 0;
 	ERROR_CHECK(
@@ -259,8 +272,10 @@ VkExtent2D VulkanPlayApp::chooseSwapExtent(
 	if (capabilities.currentExtent.width != UINT32_MAX) {
 		return capabilities.currentExtent;
 	} else {
-		VkExtent2D actualExtent = {WIDTH, HEIGHT};
-
+		int width, height;
+		SDL_GL_GetDrawableSize(window, &width, &height);
+		VkExtent2D actualExtent = {static_cast<uint32_t>(width),
+								   static_cast<uint32_t>(height)};
 		actualExtent.width = std::max(
 			capabilities.minImageExtent.width,
 			std::min(capabilities.maxImageExtent.width, actualExtent.width));
@@ -407,6 +422,8 @@ void VulkanPlayApp::initWindow(uint32_t width, uint32_t height,
 							  SDL_WINDOWPOS_CENTERED, width, height,
 							  SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 	ERROR_CHECK(window == NULL, SDL_GetError());
+	WindowData windowData = {.window = window, .dataPointer = this};
+	SDL_AddEventWatch(framebufferResizeCallback, &windowData);
 }
 
 bool VulkanPlayApp::validVulkanExtensions(vector<const char *> extensionNames) {
@@ -816,9 +833,16 @@ void VulkanPlayApp::drawFrame() {
 	vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE,
 					UINT64_MAX);
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
-						  imageAvailableSemaphores[currentFrame],
-						  VK_NULL_HANDLE, &imageIndex);
+
+	VkResult result = vkAcquireNextImageKHR(
+		device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame],
+		VK_NULL_HANDLE, &imageIndex);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		recreateSwapChain();
+		return;
+	} else
+		ERROR_CHECK(result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR,
+					"Failed to acquire swap chain image!");
 
 	// Check if a previous frame is using this image (i.e. there is its fence to
 	// wait on)
@@ -860,10 +884,31 @@ void VulkanPlayApp::drawFrame() {
 	presentInfo.pSwapchains = swapChains;
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = nullptr;	 // Optional
-	vkQueuePresentKHR(presentQueue, &presentInfo);
 
-	vkQueueWaitIdle(presentQueue);
+	result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+		framebufferResized) {
+		framebufferResized = false;
+		recreateSwapChain();
+	} else
+		ERROR_CHECK(result != VK_SUCCESS,
+					"Failed to present swap chain image!");
+
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanPlayApp::recreateSwapChain() {
+	vkDeviceWaitIdle(device);
+
+	cleanupSwapChain();
+
+	createSwapChain();
+	createImageViews();
+	createRenderPass();
+	createGraphicsPipeline();
+	createFramebuffers();
+	createCommandBuffers();
 }
 
 void VulkanPlayApp::mainLoop() {
@@ -885,29 +930,46 @@ void VulkanPlayApp::run(uint32_t width, uint32_t height, const char *name) {
 	cleanup();
 }
 
+void VulkanPlayApp::cleanupSwapChain() {
+	for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
+		vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+	}
+
+	vkFreeCommandBuffers(device, commandPool,
+						 static_cast<uint32_t>(commandBuffers.size()),
+						 commandBuffers.data());
+
+	vkDestroyPipeline(device, graphicsPipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+	vkDestroyRenderPass(device, renderPass, nullptr);
+
+	for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+		vkDestroyImageView(device, swapChainImageViews[i], nullptr);
+	}
+
+	vkDestroySwapchainKHR(device, swapChain, nullptr);
+}
+
 void VulkanPlayApp::cleanup() {
+	cleanupSwapChain();
+
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
 		vkDestroyFence(device, inFlightFences[i], nullptr);
 	}
+
 	vkDestroyCommandPool(device, commandPool, nullptr);
-	for (auto framebuffer : swapChainFramebuffers) {
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
-	}
-	vkDestroyPipeline(device, graphicsPipeline, nullptr);
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-	vkDestroyRenderPass(device, renderPass, nullptr);
-	for (auto imageView : swapChainImageViews) {
-		vkDestroyImageView(device, imageView, nullptr);
-	}
-	vkDestroySwapchainKHR(device, swapChain, nullptr);
+
 	vkDestroyDevice(device, nullptr);
+
 	if (enableValidationLayers) {
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 	}
-	vkDestroySurfaceKHR(instance, surface, 0);
+
+	vkDestroySurfaceKHR(instance, surface, nullptr);
+	vkDestroyInstance(instance, nullptr);
+
 	SDL_DestroyWindow(window);
-	vkDestroyInstance(instance, 0);
 	SDL_Quit();
 }
