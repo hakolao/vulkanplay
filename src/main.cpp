@@ -2,7 +2,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "vulkanplay.h"
+#include "vulkanplay.hpp"
 
 int main(void) {
 	VulkanPlayApp app;

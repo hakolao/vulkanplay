@@ -9,7 +9,17 @@
 #include <array>
 // ToDo don't use glm...
 #include <glm/glm.hpp>
+#define GLM_FORCE_RADIANS
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <fstream>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
+#include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 using namespace std;
@@ -40,6 +50,12 @@ struct VulkanVertex {
 	static VkVertexInputBindingDescription getBindingDescription();
 	static std::array<VkVertexInputAttributeDescription, 2>
 	getAttributeDescriptions();
+};
+
+struct VulkanUniformBufferObject {
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 proj;
 };
 
 const std::vector<VulkanVertex> vertices = {
@@ -112,6 +128,7 @@ class VulkanPlayApp {
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 
 	VkRenderPass renderPass;
+	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
@@ -121,6 +138,9 @@ class VulkanPlayApp {
 	VkDeviceMemory vertexBufferMemory;
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
+
+	std::vector<VkBuffer> uniformBuffers;
+	std::vector<VkDeviceMemory> uniformBuffersMemory;
 
 	std::vector<VkCommandBuffer> commandBuffers;
 
@@ -160,10 +180,13 @@ class VulkanPlayApp {
 	void createSyncObjects();
 	void createVertexBuffer();
 	void createIndexBuffer();
+	void createDescriptorSetLayout();
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 					  VkMemoryPropertyFlags properties, VkBuffer &buffer,
 					  VkDeviceMemory &bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+	void createUniformBuffers();
+	void updateUniformBuffer(uint32_t currentImage);
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
