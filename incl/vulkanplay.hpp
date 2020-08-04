@@ -2,6 +2,7 @@
 #define VULKANPLAY_H
 
 #include <SDL.h>
+#include <SDL_image.h>
 #include <SDL_vulkan.h>
 #include <stdio.h>
 #include <vulkan/vulkan.h>
@@ -9,6 +10,7 @@
 #include <array>
 // ToDo don't use glm...
 #include <glm/glm.hpp>
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_FORCE_RADIANS
 #include <algorithm>
 #include <chrono>
@@ -53,9 +55,9 @@ struct VulkanVertex {
 };
 
 struct VulkanUniformBufferObject {
-	glm::mat4 model;
-	glm::mat4 view;
-	glm::mat4 proj;
+	alignas(16) glm::mat4 model;
+	alignas(16) glm::mat4 view;
+	alignas(16) glm::mat4 proj;
 };
 
 const std::vector<VulkanVertex> vertices = {
@@ -139,6 +141,9 @@ class VulkanPlayApp {
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
 
+	VkDescriptorPool descriptorPool;
+	std::vector<VkDescriptorSet> descriptorSets;
+
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 
@@ -149,6 +154,9 @@ class VulkanPlayApp {
 	std::vector<VkFence> inFlightFences;
 	std::vector<VkFence> imagesInFlight;
 	size_t currentFrame = 0;
+
+	VkImage textureImage;
+	VkDeviceMemory textureImageMemory;
 
 	void createVulkanInstance();
 	void setupDebugMessenger();
@@ -181,12 +189,26 @@ class VulkanPlayApp {
 	void createVertexBuffer();
 	void createIndexBuffer();
 	void createDescriptorSetLayout();
+	void createDescriptorPool();
+	void createDescriptorSets();
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 					  VkMemoryPropertyFlags properties, VkBuffer &buffer,
 					  VkDeviceMemory &bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void createUniformBuffers();
 	void updateUniformBuffer(uint32_t currentImage);
+	void createImage(uint32_t width, uint32_t height, VkFormat format,
+					 VkImageTiling tiling, VkImageUsageFlags usage,
+					 VkMemoryPropertyFlags properties, VkImage &image,
+					 VkDeviceMemory &imageMemory);
+	void createTextureImage();
+	VkCommandBuffer beginSingleTimeCommands();
+	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+	void transitionImageLayout(VkImage image, VkFormat format,
+							   VkImageLayout oldLayout,
+							   VkImageLayout newLayout);
+	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
+						   uint32_t height);
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
