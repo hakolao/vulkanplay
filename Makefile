@@ -6,7 +6,7 @@ LIBVULKAN = ./lib/vulkan
 LIBSDL2 = ./lib/SDL2
 
 # USE THESE AT SCHOOL
-BREW_INCLUDES = /Users/ohakola/.brew/include
+BREW_INCLUDES = /Users/ohakola/.brew/include #for glm
 VULKAN_SDK_PATH = /Users/ohakola/goinfre/vulkan/macOS
 # ===
 

@@ -26,9 +26,6 @@
 
 using namespace std;
 
-// ToDo use own libcpp matrix
-// #include "libcpp_matrix.h"
-
 #define WIDTH 1280
 #define HEIGHT 720
 #define NAME "Vulkan Play"
@@ -157,6 +154,8 @@ class VulkanPlayApp {
 
 	VkImage textureImage;
 	VkDeviceMemory textureImageMemory;
+	VkImageView textureImageView;
+	VkSampler textureSampler;
 
 	void createVulkanInstance();
 	void setupDebugMessenger();
@@ -209,6 +208,9 @@ class VulkanPlayApp {
 							   VkImageLayout newLayout);
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
 						   uint32_t height);
+	VkImageView createImageView(VkImage image, VkFormat format);
+	void createTextureImageView();
+	void createTextureSampler();
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
