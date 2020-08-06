@@ -1,4 +1,23 @@
 #include "vulkanplay.hpp"
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
+bool operator==(const VulkanVertex &v1, const VulkanVertex &v2) {
+	return v1.pos == v2.pos && v1.color == v2.color &&
+		   v1.texCoord == v2.texCoord;
+}
+
+namespace std {
+template <>
+struct hash<VulkanVertex> {
+	size_t operator()(VulkanVertex const &vertex) const {
+		return ((hash<glm::vec3>()(vertex.pos) ^
+				 (hash<glm::vec3>()(vertex.color) << 1)) >>
+				1) ^
+			   (hash<glm::vec2>()(vertex.texCoord) << 1);
+	}
+};
+}  // namespace std
 
 VkVertexInputBindingDescription VulkanVertex::getBindingDescription() {
 	VkVertexInputBindingDescription bindingDescription{};
@@ -835,7 +854,7 @@ void VulkanPlayApp::createCommandBuffers() {
 		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 
 		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0,
-							 VK_INDEX_TYPE_UINT16);
+							 VK_INDEX_TYPE_UINT32);
 		vkCmdBindDescriptorSets(commandBuffers[i],
 								VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 								0, 1, &descriptorSets[i], 0, nullptr);
@@ -1131,7 +1150,7 @@ void VulkanPlayApp::createImage(uint32_t width, uint32_t height,
 
 void VulkanPlayApp::createTextureImage() {
 	SDL_Surface *image;
-	image = IMG_Load("textures/texture.jpg");
+	image = IMG_Load(TEXTURE_PATH.c_str());
 	ERROR_CHECK(!image, "Failed to load texture image!");
 
 	uint32_t texWidth = image->w;
@@ -1155,17 +1174,17 @@ void VulkanPlayApp::createTextureImage() {
 	SDL_FreeSurface(image);
 
 	createImage(
-		texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+		texWidth, texHeight, VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
-	transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+	transitionImageLayout(textureImage, VK_FORMAT_B8G8R8A8_SRGB,
 						  VK_IMAGE_LAYOUT_UNDEFINED,
 						  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	copyBufferToImage(stagingBuffer, textureImage,
 					  static_cast<uint32_t>(texWidth),
 					  static_cast<uint32_t>(texHeight));
-	transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+	transitionImageLayout(textureImage, VK_FORMAT_B8G8R8A8_SRGB,
 						  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 						  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -1176,7 +1195,6 @@ void VulkanPlayApp::createTextureImage() {
 void VulkanPlayApp::transitionImageLayout(VkImage image, VkFormat format,
 										  VkImageLayout oldLayout,
 										  VkImageLayout newLayout) {
-	(void)format;
 	VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
 	VkImageMemoryBarrier barrier{};
@@ -1281,7 +1299,7 @@ VkImageView VulkanPlayApp::createImageView(VkImage image, VkFormat format,
 }
 
 void VulkanPlayApp::createTextureImageView() {
-	textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+	textureImageView = createImageView(textureImage, VK_FORMAT_B8G8R8A8_SRGB,
 									   VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
@@ -1350,6 +1368,41 @@ VkFormat VulkanPlayApp::findSupportedFormat(
 	ERROR_CHECK(true, "Failed to find supported format!");
 }
 
+void VulkanPlayApp::loadModel() {
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string warn, err;
+	ERROR_CHECK(!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
+								  MODEL_PATH.c_str()),
+				warn + err);
+
+	std::unordered_map<VulkanVertex, uint32_t> uniqueVertices{};
+
+	for (const auto &shape : shapes) {
+		for (const auto &index : shape.mesh.indices) {
+			VulkanVertex vertex{};
+
+			vertex.pos = {attrib.vertices[3 * index.vertex_index + 0],
+						  attrib.vertices[3 * index.vertex_index + 1],
+						  attrib.vertices[3 * index.vertex_index + 2]};
+
+			vertex.texCoord = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]};
+
+			vertex.color = {1.0f, 1.0f, 1.0f};
+
+			if (uniqueVertices.count(vertex) == 0) {
+				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+				vertices.push_back(vertex);
+			}
+
+			indices.push_back(uniqueVertices[vertex]);
+		}
+	}
+}
+
 void VulkanPlayApp::initVulkan() {
 	createVulkanInstance();
 	setupDebugMessenger();
@@ -1367,6 +1420,7 @@ void VulkanPlayApp::initVulkan() {
 	createTextureImage();
 	createTextureImageView();
 	createTextureSampler();
+	loadModel();
 	createVertexBuffer();
 	createIndexBuffer();
 	createUniformBuffers();

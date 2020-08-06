@@ -4,11 +4,12 @@ DIR_SRC = ./src
 DIR_OBJ = temp
 LIBVULKAN = ./lib/vulkan
 LIBSDL2 = ./lib/SDL2
-
+TINYOBJLOADER = ./lib/tinyobjloader
 # USE THESE AT SCHOOL
 BREW_INCLUDES = /Users/ohakola/.brew/include #for glm
 VULKAN_SDK_PATH = /Users/ohakola/goinfre/vulkan/macOS
 # ===
+
 
 VULKAN_FLAGS =  -rpath $(LIBVULKAN) \
 				-framework vulkan -F$(LIBVULKAN)/ \
@@ -20,12 +21,13 @@ VULKAN_FLAGS =  -rpath $(LIBVULKAN) \
 INCL = -I$(BREW_INCLUDES) \
 		-I$(VULKAN_SDK_PATH)/include \
 		-I ./incl \
+		-I$(TINYOBJLOADER) \
 		-I$(LIBVULKAN)/vulkan.framework/Headers \
 		-I$(LIBSDL2)/SDL2.framework/Headers \
 		-I$(LIBSDL2)/SDL2_image.framework/Headers \
 		-I$(LIBSDL2)/SDL2_ttf.framework/Headers
 
-FLAGS = -Wall -Wextra -Werror -O2 -std=c++17
+FLAGS = -Wall -Wextra -Werror -O3 -std=c++17
 SOURCES = main.cpp \
 			vulkanplay.cpp
 

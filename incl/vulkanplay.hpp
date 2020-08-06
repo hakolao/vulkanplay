@@ -13,16 +13,19 @@
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <fstream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/hash.hpp>
 #include <iostream>
 #include <map>
 #include <optional>
 #include <set>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
@@ -30,6 +33,9 @@ using namespace std;
 #define WIDTH 1280
 #define HEIGHT 720
 #define NAME "Vulkan Play"
+
+const std::string MODEL_PATH = "models/viking_room.obj";
+const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -59,24 +65,6 @@ struct VulkanUniformBufferObject {
 	alignas(16) glm::mat4 view;
 	alignas(16) glm::mat4 proj;
 };
-
-const std::vector<VulkanVertex> vertices = {
-	{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-	{{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-	{{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-	{{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-	{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-	{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-	{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
-
-const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
-
-// const std::vector<Vertex> vertices = {
-// 	Vertex(0.0f, -0.5f, 0.0f, Color(1.0f, 0.0f, 0.0f)),
-// 	Vertex(0.5f, 0.5f, 0.0f, Color(0.0f, 1.0f, 0.0f)),
-// 	Vertex(-0.5f, 0.5f, 0.0f, Color(0.0f, 0.0f, 1.0f))};
 
 #define ERROR_CHECK(test, message)                     \
 	do {                                               \
@@ -141,6 +129,8 @@ class VulkanPlayApp {
 
 	VkCommandPool commandPool;
 
+	std::vector<VulkanVertex> vertices;
+	std::vector<uint32_t> indices;
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
 	VkBuffer indexBuffer;
@@ -230,6 +220,7 @@ class VulkanPlayApp {
 								 VkFormatFeatureFlags features);
 	VkFormat findDepthFormat();
 	bool hasStencilComponent(VkFormat format);
+	void loadModel();
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
