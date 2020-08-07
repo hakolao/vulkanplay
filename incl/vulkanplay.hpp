@@ -37,6 +37,9 @@ using namespace std;
 const std::string MODEL_PATH = "models/viking_room.obj";
 const std::string TEXTURE_PATH = "textures/viking_room.png";
 
+// When not defined, validation layers leak memory...
+#define NDEBUG
+
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
@@ -160,6 +163,12 @@ class VulkanPlayApp {
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
 
+	VkImage colorImage;
+	VkDeviceMemory colorImageMemory;
+	VkImageView colorImageView;
+
+	VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+
 	void createVulkanInstance();
 	void setupDebugMessenger();
 	void createVulkanSurface();
@@ -200,9 +209,10 @@ class VulkanPlayApp {
 	void createUniformBuffers();
 	void updateUniformBuffer(uint32_t currentImage);
 	void createImage(uint32_t width, uint32_t height, uint32_t mipLevels,
-					 VkFormat format, VkImageTiling tiling,
-					 VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-					 VkImage &image, VkDeviceMemory &imageMemory);
+					 VkSampleCountFlagBits numSamples, VkFormat format,
+					 VkImageTiling tiling, VkImageUsageFlags usage,
+					 VkMemoryPropertyFlags properties, VkImage &image,
+					 VkDeviceMemory &imageMemory);
 	void createTextureImage();
 	VkCommandBuffer beginSingleTimeCommands();
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
@@ -225,6 +235,8 @@ class VulkanPlayApp {
 	void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth,
 						 int32_t texHeight, uint32_t mipLevels);
 	void loadModel();
+	VkSampleCountFlagBits getMaxUsableSampleCount();
+	void createColorResources();
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
