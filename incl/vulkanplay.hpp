@@ -150,6 +150,7 @@ class VulkanPlayApp {
 	std::vector<VkFence> imagesInFlight;
 	size_t currentFrame = 0;
 
+	uint32_t mipLevels;
 	VkImage textureImage;
 	VkDeviceMemory textureImageMemory;
 	VkImageView textureImageView;
@@ -198,20 +199,21 @@ class VulkanPlayApp {
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void createUniformBuffers();
 	void updateUniformBuffer(uint32_t currentImage);
-	void createImage(uint32_t width, uint32_t height, VkFormat format,
-					 VkImageTiling tiling, VkImageUsageFlags usage,
-					 VkMemoryPropertyFlags properties, VkImage &image,
-					 VkDeviceMemory &imageMemory);
+	void createImage(uint32_t width, uint32_t height, uint32_t mipLevels,
+					 VkFormat format, VkImageTiling tiling,
+					 VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+					 VkImage &image, VkDeviceMemory &imageMemory);
 	void createTextureImage();
 	VkCommandBuffer beginSingleTimeCommands();
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 	void transitionImageLayout(VkImage image, VkFormat format,
-							   VkImageLayout oldLayout,
-							   VkImageLayout newLayout);
+							   VkImageLayout oldLayout, VkImageLayout newLayout,
+							   uint32_t mipLevels);
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
 						   uint32_t height);
 	VkImageView createImageView(VkImage image, VkFormat format,
-								VkImageAspectFlags aspectFlags);
+								VkImageAspectFlags aspectFlags,
+								uint32_t mipLevels);
 	void createTextureImageView();
 	void createTextureSampler();
 	void createDepthResources();
@@ -220,6 +222,8 @@ class VulkanPlayApp {
 								 VkFormatFeatureFlags features);
 	VkFormat findDepthFormat();
 	bool hasStencilComponent(VkFormat format);
+	void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth,
+						 int32_t texHeight, uint32_t mipLevels);
 	void loadModel();
 	void initWindow();
 	void initVulkan();

@@ -6,8 +6,10 @@ LIBVULKAN = ./lib/vulkan
 LIBSDL2 = ./lib/SDL2
 TINYOBJLOADER = ./lib/tinyobjloader
 # USE THESE AT SCHOOL
-BREW_INCLUDES = /Users/ohakola/.brew/include #for glm
-VULKAN_SDK_PATH = /Users/ohakola/goinfre/vulkan/macOS
+# BREW_INCLUDES = /Users/ohakola/.brew/include #for glm
+# VULKAN_SDK_PATH = /Users/ohakola/goinfre/vulkan/macOS
+# -I$(BREW_INCLUDES)
+# -I$(VULKAN_SDK_PATH)/include
 # ===
 
 
@@ -18,9 +20,8 @@ VULKAN_FLAGS =  -rpath $(LIBVULKAN) \
 				-framework SDL2_image -F$(LIBSDL2)/ \
 				-framework SDL2_ttf -F$(LIBSDL2)/
 
-INCL = -I$(BREW_INCLUDES) \
-		-I$(VULKAN_SDK_PATH)/include \
-		-I ./incl \
+
+INCL =	-I ./incl \
 		-I$(TINYOBJLOADER) \
 		-I$(LIBVULKAN)/vulkan.framework/Headers \
 		-I$(LIBSDL2)/SDL2.framework/Headers \
